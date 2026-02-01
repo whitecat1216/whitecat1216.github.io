@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -162,7 +162,7 @@ const SkillsSection = () => (
   </section>
 )
 
-const BlogPreview = ({ posts, onScrollToBlog }: { posts: BlogPost[]; onScrollToBlog: () => void }) => (
+const BlogPreview = ({ posts }: { posts: BlogPost[] }) => (
   <section id="blog-preview" className="py-5 bg-light">
     <div className="container">
       <h2 className="section-title">ブログ</h2>
@@ -191,9 +191,9 @@ const BlogPreview = ({ posts, onScrollToBlog }: { posts: BlogPost[]; onScrollToB
                   <Link to={`/blog/${post.slug}`} className="btn btn-outline-primary btn-sm">
                     記事を開く
                   </Link>
-                  <button type="button" className="btn btn-outline-secondary btn-sm" onClick={onScrollToBlog}>
+                  <Link to="/blog" className="btn btn-outline-secondary btn-sm">
                     一覧を見る
-                  </button>
+                  </Link>
                 </div>
               </div>
             </article>
@@ -344,10 +344,178 @@ const HomePage = ({ posts, onScrollToBlog }: { posts: BlogPost[]; onScrollToBlog
       <Hero onBlogClick={onScrollToBlog} />
       <AboutSection />
       <SkillsSection />
-      {latestPosts.length > 0 && <BlogPreview posts={latestPosts} onScrollToBlog={onScrollToBlog} />}
+      {latestPosts.length > 0 && <BlogPreview posts={latestPosts} />}
       <GitHubShowcase username={GITHUB_USERNAME} />
       <ExperienceSection />
     </>
+  )
+}
+
+const BlogIndexPage = ({ posts }: { posts: BlogPost[] }) => {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedTag, setSelectedTag] = useState<string | null>(null)
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
+
+  const tags = useMemo(() => {
+    const tagSet = new Set<string>()
+    posts.forEach((post) => {
+      post.tags.forEach((tag) => tagSet.add(tag))
+    })
+    return Array.from(tagSet).sort((a, b) => a.localeCompare(b, 'ja'))
+  }, [posts])
+
+  const filteredPosts = useMemo(() => {
+    const keyword = searchQuery.trim().toLowerCase()
+
+    const getTimestamp = (value?: string) => {
+      if (!value) return 0
+      const timestamp = new Date(value).getTime()
+      return Number.isNaN(timestamp) ? 0 : timestamp
+    }
+
+    return [...posts]
+      .filter((post) => {
+        if (selectedTag && !post.tags.includes(selectedTag)) {
+          return false
+        }
+
+        if (keyword.length === 0) {
+          return true
+        }
+
+        const normalizedTitle = post.title.toLowerCase()
+        const normalizedSummary = post.summary.toLowerCase()
+        const normalizedTags = post.tags.join(' ').toLowerCase()
+
+        return (
+          normalizedTitle.includes(keyword) ||
+          normalizedSummary.includes(keyword) ||
+          normalizedTags.includes(keyword)
+        )
+      })
+      .sort((a, b) => {
+        const diff = getTimestamp(a.date) - getTimestamp(b.date)
+        return sortOrder === 'asc' ? diff : -diff
+      })
+  }, [posts, searchQuery, selectedTag, sortOrder])
+
+  const handleTagClick = (tag: string) => {
+    setSelectedTag((current) => (current === tag ? null : tag))
+  }
+
+  const handleReset = () => {
+    setSearchQuery('')
+    setSelectedTag(null)
+    setSortOrder('desc')
+  }
+
+  return (
+    <section className="py-5 bg-light">
+      <div className="container">
+        <div className="d-flex flex-column flex-lg-row align-items-lg-end justify-content-lg-between gap-3 mb-4">
+          <div>
+            <h1 className="section-title mb-2">ブログ一覧</h1>
+            <p className="text-secondary mb-0">
+              全{posts.length}件中{filteredPosts.length}件を表示しています。
+            </p>
+          </div>
+          <div className="d-flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm"
+              onClick={() => setSortOrder((current) => (current === 'desc' ? 'asc' : 'desc'))}
+            >
+              {sortOrder === 'desc' ? '新しい順' : '古い順'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm"
+              onClick={handleReset}
+              disabled={searchQuery.length === 0 && !selectedTag && sortOrder === 'desc'}
+            >
+              条件をリセット
+            </button>
+          </div>
+        </div>
+
+        <div className="row g-3 align-items-center mb-4">
+          <div className="col-12 col-lg-6">
+            <label htmlFor="blog-search" className="form-label visually-hidden">
+              ブログ検索
+            </label>
+            <div className="input-group">
+              <span className="input-group-text">
+                <i className="bi bi-search" />
+              </span>
+              <input
+                id="blog-search"
+                type="search"
+                className="form-control"
+                placeholder="キーワードで絞り込み"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+        </div>
+
+        {tags.length > 0 && (
+          <div className="mb-4">
+            <div className="d-flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  className={`btn btn-sm ${selectedTag === tag ? 'btn-primary' : 'btn-outline-secondary'}`}
+                  onClick={() => handleTagClick(tag)}
+                >
+                  #{tag}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="row g-4">
+          {filteredPosts.map((post) => (
+            <div className="col-12 col-lg-6" key={post.slug}>
+              <article className="card h-100 shadow-sm border-0">
+                <div className="card-body d-flex flex-column">
+                  <div className="d-flex justify-content-between align-items-start gap-3 mb-2">
+                    <h2 className="h5 mb-0">{post.title}</h2>
+                    <span className="badge bg-primary-subtle text-primary-emphasis">
+                      {post.date ? new Date(post.date).toLocaleDateString('ja-JP') : '日付未設定'}
+                    </span>
+                  </div>
+                  {post.tags.length > 0 && (
+                    <div className="mb-2 d-flex flex-wrap gap-2 small text-muted">
+                      {post.tags.map((tag) => (
+                        <span key={tag} className="badge bg-secondary-subtle text-secondary-emphasis">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-secondary flex-grow-1">{post.summary}</p>
+                  <div className="mt-auto">
+                    <Link to={`/blog/${post.slug}`} className="btn btn-outline-primary btn-sm">
+                      記事を読む
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            </div>
+          ))}
+        </div>
+
+        {filteredPosts.length === 0 && (
+          <div className="alert alert-secondary mt-4" role="status">
+            条件に一致する記事が見つかりませんでした。
+          </div>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -410,6 +578,14 @@ const App = () => {
   const [activeId, setActiveId] = useState<string>(navItems[0]?.id ?? '')
   const locationState = (location.state as LocationState | null) ?? null
 
+  const scrollToSection = useCallback((sectionId: string) => {
+    const element = document.getElementById(sectionId === 'blog' ? 'blog-preview' : sectionId)
+    if (element) {
+      const offsetTop = element.offsetTop - 96
+      window.scrollTo({ top: offsetTop, behavior: 'smooth' })
+    }
+  }, [])
+
   useEffect(() => {
     if (!locationState?.focusSection) {
       return
@@ -419,7 +595,7 @@ const App = () => {
     navigate(location.pathname, { replace: true, state: null })
 
     return () => window.clearTimeout(timer)
-  }, [locationState, location.pathname, navigate])
+  }, [locationState, location.pathname, navigate, scrollToSection])
 
   useEffect(() => {
     if (location.pathname.startsWith('/blog')) {
@@ -448,14 +624,6 @@ const App = () => {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [location.pathname])
 
-  const scrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId === 'blog' ? 'blog-preview' : sectionId)
-    if (element) {
-      const offsetTop = element.offsetTop - 96
-      window.scrollTo({ top: offsetTop, behavior: 'smooth' })
-    }
-  }
-
   const handleSectionSelect = (sectionId: string) => {
     const activeSection = sectionId === 'blog' ? 'blog' : sectionId
     setActiveId(activeSection)
@@ -479,7 +647,7 @@ const App = () => {
       <main>
         <Routes>
           <Route path="/" element={<HomePage posts={posts} onScrollToBlog={() => handleSectionSelect('blog')} />} />
-          <Route path="/blog" element={<Navigate to="/" replace state={{ focusSection: 'blog' }} />} />
+          <Route path="/blog" element={<BlogIndexPage posts={posts} />} />
           <Route path="/blog/:slug" element={<BlogPostPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
