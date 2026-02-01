@@ -25,12 +25,16 @@ type GitHubRepo = {
   updated_at: string
 }
 
+type LocationState = {
+  focusSection?: string
+}
+
 const GITHUB_USERNAME = 'whitecat1216'
 
 const navItems: NavItem[] = [
   { id: 'about', label: 'プロフィール', type: 'section' },
   { id: 'skills', label: 'スキル', type: 'section' },
-  { id: 'blog', label: 'ブログ', type: 'route', path: '/blog' },
+  { id: 'blog', label: 'ブログ', type: 'section' },
   { id: 'github', label: '作品', type: 'section' },
   { id: 'experience', label: '経歴', type: 'section' },
 ]
@@ -158,7 +162,7 @@ const SkillsSection = () => (
   </section>
 )
 
-const BlogPreview = ({ posts, onNavigateToBlog }: { posts: BlogPost[]; onNavigateToBlog: () => void }) => (
+const BlogPreview = ({ posts, onScrollToBlog }: { posts: BlogPost[]; onScrollToBlog: () => void }) => (
   <section id="blog-preview" className="py-5 bg-light">
     <div className="container">
       <h2 className="section-title">ブログ</h2>
@@ -187,7 +191,7 @@ const BlogPreview = ({ posts, onNavigateToBlog }: { posts: BlogPost[]; onNavigat
                   <Link to={`/blog/${post.slug}`} className="btn btn-outline-primary btn-sm">
                     記事を開く
                   </Link>
-                  <button type="button" className="btn btn-outline-secondary btn-sm" onClick={onNavigateToBlog}>
+                  <button type="button" className="btn btn-outline-secondary btn-sm" onClick={onScrollToBlog}>
                     一覧を見る
                   </button>
                 </div>
@@ -332,59 +336,20 @@ const Footer = () => {
   )
 }
 
-const HomePage = ({ posts, onNavigateToBlog }: { posts: BlogPost[]; onNavigateToBlog: () => void }) => {
+const HomePage = ({ posts, onScrollToBlog }: { posts: BlogPost[]; onScrollToBlog: () => void }) => {
   const latestPosts = posts.slice(0, 2)
 
   return (
     <>
-      <Hero onBlogClick={onNavigateToBlog} />
+      <Hero onBlogClick={onScrollToBlog} />
       <AboutSection />
       <SkillsSection />
-      {latestPosts.length > 0 && <BlogPreview posts={latestPosts} onNavigateToBlog={onNavigateToBlog} />}
+      {latestPosts.length > 0 && <BlogPreview posts={latestPosts} onScrollToBlog={onScrollToBlog} />}
       <GitHubShowcase username={GITHUB_USERNAME} />
       <ExperienceSection />
     </>
   )
 }
-
-const BlogIndexPage = ({ posts }: { posts: BlogPost[] }) => (
-  <section className="py-5">
-    <div className="container">
-      <h1 className="section-title mb-4">ブログ</h1>
-      <div className="row g-4">
-        {posts.map((post) => (
-          <div className="col-12 col-lg-6" key={post.slug}>
-            <article className="card h-100 shadow-sm border-0">
-              <div className="card-body d-flex flex-column">
-                <div className="d-flex justify-content-between align-items-start gap-3 mb-2">
-                  <h2 className="h5 mb-0">{post.title}</h2>
-                  <span className="badge bg-primary-subtle text-primary-emphasis">
-                    {post.date ? new Date(post.date).toLocaleDateString('ja-JP') : '日付未設定'}
-                  </span>
-                </div>
-                {post.tags.length > 0 && (
-                  <div className="mb-2 d-flex flex-wrap gap-2 small text-muted">
-                    {post.tags.map((tag) => (
-                      <span key={tag} className="badge bg-secondary-subtle text-secondary-emphasis">
-                        #{tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <p className="text-secondary flex-grow-1">{post.summary}</p>
-                <div className="mt-auto d-flex gap-2">
-                  <Link to={`/blog/${post.slug}`} className="btn btn-outline-primary btn-sm">
-                    記事を読む
-                  </Link>
-                </div>
-              </div>
-            </article>
-          </div>
-        ))}
-      </div>
-    </div>
-  </section>
-)
 
 const BlogPostPage = () => {
   const { slug } = useParams<{ slug: string }>()
@@ -397,7 +362,7 @@ const BlogPostPage = () => {
           <div className="alert alert-warning" role="alert">
             記事が見つかりませんでした。
           </div>
-          <Link to="/blog" className="btn btn-outline-primary btn-sm">
+          <Link to="/" state={{ focusSection: 'blog' }} className="btn btn-outline-primary btn-sm">
             ブログ一覧に戻る
           </Link>
         </div>
@@ -409,7 +374,7 @@ const BlogPostPage = () => {
     <section className="py-5">
       <div className="container">
         <div className="mb-3">
-          <Link to="/blog" className="btn btn-outline-secondary btn-sm">
+          <Link to="/" state={{ focusSection: 'blog' }} className="btn btn-outline-secondary btn-sm">
             一覧へ戻る
           </Link>
         </div>
@@ -443,6 +408,18 @@ const App = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const [activeId, setActiveId] = useState<string>(navItems[0]?.id ?? '')
+  const locationState = (location.state as LocationState | null) ?? null
+
+  useEffect(() => {
+    if (!locationState?.focusSection) {
+      return
+    }
+
+    const timer = window.setTimeout(() => scrollToSection(locationState.focusSection), 120)
+    navigate(location.pathname, { replace: true, state: null })
+
+    return () => window.clearTimeout(timer)
+  }, [locationState, location.pathname, navigate])
 
   useEffect(() => {
     if (location.pathname.startsWith('/blog')) {
@@ -480,13 +457,15 @@ const App = () => {
   }
 
   const handleSectionSelect = (sectionId: string) => {
-    setActiveId(sectionId === 'blog' ? 'blog' : sectionId)
+    const activeSection = sectionId === 'blog' ? 'blog' : sectionId
+    setActiveId(activeSection)
+
     if (location.pathname !== '/') {
-      navigate('/')
-      setTimeout(() => scrollToSection(sectionId), 120)
-    } else {
-      scrollToSection(sectionId)
+      navigate('/', { state: { focusSection: sectionId } })
+      return
     }
+
+    scrollToSection(sectionId)
   }
 
   const handleRouteSelect = (path: string) => {
@@ -499,11 +478,8 @@ const App = () => {
       <NavBar activeId={activeId} onSectionSelect={handleSectionSelect} onRouteSelect={handleRouteSelect} />
       <main>
         <Routes>
-          <Route
-            path="/"
-            element={<HomePage posts={posts} onNavigateToBlog={() => handleRouteSelect('/blog')} />}
-          />
-          <Route path="/blog" element={<BlogIndexPage posts={posts} />} />
+          <Route path="/" element={<HomePage posts={posts} onScrollToBlog={() => handleSectionSelect('blog')} />} />
+          <Route path="/blog" element={<Navigate to="/" replace state={{ focusSection: 'blog' }} />} />
           <Route path="/blog/:slug" element={<BlogPostPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
