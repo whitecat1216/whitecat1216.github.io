@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">Sample Cover</title>
+  <desc id="desc">Abstract gradient background used as a placeholder cover image.</desc>
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9" />
+      <stop offset="50%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#grad)" />
+  <g fill="#ffffff" opacity="0.85">
+    <circle cx="180" cy="140" r="48" />
+    <circle cx="732" cy="360" r="72" />
+    <circle cx="516" cy="204" r="92" />
+  </g>
+  <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="'Helvetica Neue', Arial, sans-serif" font-size="48" fill="#f8fafc">
+    Portfolio Blog
+  </text>
+</svg>
